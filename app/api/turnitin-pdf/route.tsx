@@ -305,25 +305,26 @@ const styles = StyleSheet.create({
 })
 
 export async function GET(request: Request) {
-    const url = new URL(request.url)
+    try {
+        const url = new URL(request.url)
+        
+        const reportTitle = url.searchParams.get('reportTitle') ?? 'Ccw C'
+        const subtitle = url.searchParams.get('subtitle') ?? 'ccw'
+        const fileName = url.searchParams.get('fileName') ?? 'CW2-Agentic-AI.docx'
+        const wordCount = Number(url.searchParams.get('wordCount') ?? '4125')
+        const charCount = Number(url.searchParams.get('charCount') ?? '25069')
+        const similarityPercent = Number(url.searchParams.get('similarityPercent') ?? '0')
+        const aiPercent = Number(url.searchParams.get('aiPercent') ?? '0')
+        const fileSize = url.searchParams.get('fileSize') ?? '380.7 KB'
+        const institution = url.searchParams.get('institution') ?? 'COMSATS Institute of Information Technology'
+        const docPages = Number(url.searchParams.get('docPages') ?? '1')
+        const submissionId = url.searchParams.get('submissionId') ?? `trn:oid:::1:${Math.floor(Math.random() * 9000000000 + 1000000000)}`
+        
+        const now = new Date()
+        const submissionDate = formatTurnitinDate(now)
+        const downloadDate = formatTurnitinDate(new Date(now.getTime() + 2 * 60 * 1000))
 
-    const reportTitle = url.searchParams.get('reportTitle') ?? 'Ccw C'
-    const subtitle = url.searchParams.get('subtitle') ?? 'ccw'
-    const fileName = url.searchParams.get('fileName') ?? 'CW2-Agentic-AI.docx'
-    const wordCount = Number(url.searchParams.get('wordCount') ?? '4125')
-    const charCount = Number(url.searchParams.get('charCount') ?? '25069')
-    const similarityPercent = Number(url.searchParams.get('similarityPercent') ?? '0')
-    const aiPercent = Number(url.searchParams.get('aiPercent') ?? '0')
-    const fileSize = url.searchParams.get('fileSize') ?? '380.7 KB'
-    const docPages = Number(url.searchParams.get('docPages') ?? '17')
-    const institution = url.searchParams.get('institution') ?? 'COMSATS Institute of Information Technology'
-
-    const submissionId = generateSubmissionId()
-    const now = new Date()
-    const submissionDate = formatTurnitinDate(now)
-    const downloadDate = formatTurnitinDate(new Date(now.getTime() + 2 * 60 * 1000))
-
-    const doc = (
+        const doc = (
         <Document>
             <Page size={[8.68 * 72, 10.9 * 72]} style={styles.page1}>
 
@@ -454,7 +455,7 @@ export async function GET(request: Request) {
                 <View style={styles.hr} />
                 <View style={styles.headerRow}>
                     <View style={styles.leftHeader}>
-                        <Text style={styles.percent}>27% detected as AI</Text>
+                        <Text style={styles.percent}>{aiPercent}% detected as AI</Text>
                         <Text style={styles.subtitle}>
                             The percentage indicates the combined amount of likely
                             AI-generated text as well as likely AI-generated text that was
@@ -483,7 +484,7 @@ export async function GET(request: Request) {
                     <View style={styles.groupItem}>
                         <Image src={robot1} style={styles.icon2} />
                         <View style={styles.groupTextBlock}>
-                            <Text style={styles.detailValue2}>25 AI-generated only 27%</Text>
+                            <Text style={styles.detailValue2}>25 AI-generated only {aiPercent}%</Text>
                             <Text style={styles.detailLabel}>
                                 Likely AI-generated text from a large-language model.
                             </Text>
@@ -586,63 +587,25 @@ export async function GET(request: Request) {
                     />
                 </View>
             </Page>
-            <Page size={[8.68 * 72, 10.9 * 72]} style={styles.page2}>
-
-                <View style={styles.header}>
-                    <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
-                        <Image
-                            style={styles.logo}
-                            src={base64String}
-                        />
-                        <Text
-
-                            render={({ pageNumber, totalPages }) =>
-                                `Page ${pageNumber} of ${totalPages} - Cover Page`
-                            }
-                            fixed
-                        />
-                    </View>
-                    <Text
-
-                        render={({ pageNumber, totalPages }) =>
-                            `Submission ID   ${submissionId}`
-                        }
-                        fixed
-                    />
-                </View>
-
-                <View style={styles.footer}>
-                    <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
-                        <Image
-                            style={styles.logo}
-                            src={base64String}
-                        />
-                        <Text
-
-                            render={({ pageNumber, totalPages }) =>
-                                `Page ${pageNumber} of ${totalPages} - Cover Page`
-                            }
-                            fixed
-                        />
-                    </View>
-                    <Text
-
-                        render={({ pageNumber, totalPages }) =>
-                            `Submission ID   ${submissionId}`
-                        }
-                        fixed
-                    />
-                </View>
-            </Page>
         </Document>
     )
 
-    const pdfBuffer = await pdf(doc).toBuffer()
+        const pdfBuffer = await pdf(doc).toBuffer()
 
-    return new NextResponse(pdfBuffer as any, {
-        headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': 'attachment; filename="turnitin-report.pdf"'
-        }
-    })
+        return new NextResponse(pdfBuffer as any, {
+            headers: {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': 'attachment; filename="turnitin-report.pdf"'
+            }
+        })
+    } catch (error) {
+        console.error('Error in turnitin-pdf route:', error);
+        return new NextResponse(JSON.stringify({ 
+            error: 'Failed to generate PDF',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
 }

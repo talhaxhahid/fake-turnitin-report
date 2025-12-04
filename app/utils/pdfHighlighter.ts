@@ -16,9 +16,9 @@ async function extractTextContent(pdfBytes: Uint8Array): Promise<TextItem[]> {
     // Dynamic import for pdf.js
     const PDFJS = await import('pdfjs-dist');
 
-    // Configure worker
+    // Use local worker file copied to public folder
     if (typeof window !== 'undefined') {
-        PDFJS.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS.version}/pdf.worker.min.js`;
+        PDFJS.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
     }
 
     const loadingTask = PDFJS.getDocument({ data: pdfBytes });
@@ -30,20 +30,30 @@ async function extractTextContent(pdfBytes: Uint8Array): Promise<TextItem[]> {
         const textContent = await page.getTextContent();
 
         for (const item of textContent.items as any[]) {
-            if (!item.transform || !item.str) continue;
+            if (!item.transform || !item.str || item.str.trim() === '') continue;
 
-            const [, , , , x, y] = item.transform;
-            textItems.push({
-                text: item.str,
-                x,
-                y,
-                width: item.width,
-                height: item.height,
-                pageIndex
-            });
+            // Transform matrix: [scaleX, skewX, skewY, scaleY, translateX, translateY]
+            const [scaleX, , , scaleY, x, y] = item.transform;
+            
+            // Calculate width from the item width property or estimate from text length
+            const width = item.width || (item.str.length * Math.abs(scaleX) * 0.6);
+            // Height is typically the absolute value of scaleY (font size)
+            const height = Math.abs(scaleY) || 12;
+
+            if (width > 0 && height > 0) {
+                textItems.push({
+                    text: item.str,
+                    x,
+                    y,
+                    width,
+                    height,
+                    pageIndex
+                });
+            }
         }
     }
 
+    console.log(`Extracted ${textItems.length} text items from PDF`);
     return textItems;
 }
 
@@ -98,29 +108,28 @@ function selectRandomChunks(textItems: TextItem[], percentage: number): TextItem
 }
 
 /**
- * Add yellow highlights to PDF at specified text positions
+ * Add cyan highlights to PDF at specified text positions
  */
 async function addHighlightsToPdf(pdfBytes: Uint8Array, highlightItems: TextItem[]): Promise<Uint8Array> {
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const pages = pdfDoc.getPages();
 
+    console.log(`Adding ${highlightItems.length} highlights to PDF`);
+
     for (const item of highlightItems) {
         if (item.pageIndex >= pages.length) continue;
 
         const page = pages[item.pageIndex];
-        const { height: pageHeight } = page.getSize();
 
-        // Convert coordinates (PDF.js uses different coordinate system than pdf-lib)
-        const y = pageHeight - item.y - item.height;
-
-        // Draw yellow rectangle behind text
+        // PDF.js y-coordinate is already in PDF coordinate system (bottom-left origin)
+        // Just use the coordinates directly
         page.drawRectangle({
             x: item.x,
-            y,
+            y: item.y - 2, // Slight adjustment for better positioning
             width: item.width,
-            height: item.height,
-            color: rgb(1, 1, 0), // Yellow
-            opacity: 0.4,
+            height: item.height + 4, // Add padding
+            color: rgb(0, 1, 1), // Cyan
+            opacity: 0.3,
             borderOpacity: 0
         });
     }
@@ -132,22 +141,46 @@ async function addHighlightsToPdf(pdfBytes: Uint8Array, highlightItems: TextItem
  * Main function: Highlight random text in PDF based on percentage
  */
 export async function highlightPdfText(pdfBytes: Uint8Array, percentage: number): Promise<Uint8Array> {
-    if (percentage <= 0) return pdfBytes;
+    console.log(`Highlighting PDF with ${percentage}% AI detection`);
+    
+    if (percentage <= 0) {
+        console.log('Percentage is 0 or less, returning original PDF');
+        return pdfBytes;
+    }
+
+    // Make a copy of original bytes to return if highlighting fails
+    const originalBytes = new Uint8Array(pdfBytes);
 
     try {
+        // First check if pdf-lib can load this PDF
+        const { PDFDocument } = await import('pdf-lib');
+        try {
+            await PDFDocument.load(pdfBytes);
+        } catch (loadError) {
+            console.warn('PDF format not compatible with highlighting, returning original:', loadError);
+            return originalBytes;
+        }
+
         // Extract text with positions
         const textItems = await extractTextContent(pdfBytes);
+        console.log(`Found ${textItems.length} text items`);
+
+        if (textItems.length === 0) {
+            console.log('No text items found in PDF');
+            return originalBytes;
+        }
 
         // Select random chunks to highlight
         const itemsToHighlight = selectRandomChunks(textItems, percentage);
+        console.log(`Selected ${itemsToHighlight.length} items to highlight`);
 
         // Apply highlights
-        const highlightedPdf = await addHighlightsToPdf(pdfBytes, itemsToHighlight);
+        const highlightedPdf = await addHighlightsToPdf(originalBytes, itemsToHighlight);
 
         return highlightedPdf;
     } catch (error) {
         console.error('Error highlighting PDF:', error);
         // Return original PDF if highlighting fails
-        return pdfBytes;
+        return originalBytes;
     }
 }

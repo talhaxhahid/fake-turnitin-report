@@ -139,7 +139,10 @@ export default function Home() {
       setUploadProgress(60);
 
       const response = await fetch(`/api/turnitin-pdf?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to generate Turnitin report');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to generate Turnitin report');
+      }
 
       const turnitinPdfBytes = new Uint8Array(await response.arrayBuffer());
 
@@ -183,7 +186,8 @@ export default function Home() {
       }, 1000);
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Failed to generate report. Please try again.');
+      console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      alert(`Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsUploading(false);
       setUploadProgress(0);
     }
