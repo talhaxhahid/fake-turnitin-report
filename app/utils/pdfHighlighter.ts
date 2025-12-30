@@ -60,53 +60,113 @@ async function extractTextContent(pdfBytes: Uint8Array): Promise<TextItem[]> {
 }
 
 /**
- * Calculate total word count from text items
+ * Count words in a text string
  */
-function calculateWordCount(textItems: TextItem[]): number {
-    const allText = textItems.map(item => item.text).join(' ');
-    const words = allText.split(/\s+/).filter(Boolean);
-    return words.length;
+function countWords(text: string): number {
+    return text.split(/\s+/).filter(word => word.length > 0).length;
 }
 
 /**
  * Select random chunks of text to highlight based on percentage
+ * - Each chunk must contain at least 25 consecutive words
+ * - Works with text items directly, grouping consecutive items until word count >= 25
  */
 function selectRandomChunks(textItems: TextItem[], percentage: number): TextItem[] {
     if (percentage <= 0 || textItems.length === 0) return [];
 
-    const totalWords = calculateWordCount(textItems);
-    const wordsToHighlight = Math.floor((totalWords * percentage) / 100);
+    const MIN_WORDS_PER_CHUNK = 25;
 
-    // Group consecutive text items into chunks (groups of 3-10 items)
-    const chunks: TextItem[][] = [];
+    // Count total words in document
+    let totalWords = 0;
+    for (const item of textItems) {
+        totalWords += countWords(item.text);
+    }
+
+    console.log(`Total words in document: ${totalWords}`);
+
+    if (totalWords < MIN_WORDS_PER_CHUNK) {
+        console.log(`Document has fewer than ${MIN_WORDS_PER_CHUNK} words, cannot create highlights`);
+        return [];
+    }
+
+    const wordsToHighlight = Math.floor((totalWords * percentage) / 100);
+    console.log(`Target words to highlight: ${wordsToHighlight}`);
+
+    if (wordsToHighlight < MIN_WORDS_PER_CHUNK) {
+        console.log(`Not enough words to highlight (need at least ${MIN_WORDS_PER_CHUNK})`);
+        return [];
+    }
+
+    // Create chunks by grouping consecutive text items until we have at least MIN_WORDS_PER_CHUNK words
+    const chunks: { items: TextItem[]; wordCount: number }[] = [];
     let currentChunk: TextItem[] = [];
+    let currentWordCount = 0;
+    // Random target between 25 and 50 words per chunk
+    let targetChunkSize = Math.floor(Math.random() * 26) + MIN_WORDS_PER_CHUNK;
 
     for (let i = 0; i < textItems.length; i++) {
-        currentChunk.push(textItems[i]);
+        const item = textItems[i];
+        const itemWordCount = countWords(item.text);
+        
+        currentChunk.push(item);
+        currentWordCount += itemWordCount;
 
-        // Create chunk every 3-10 items randomly
-        const chunkSize = Math.floor(Math.random() * 8) + 3;
-        if (currentChunk.length >= chunkSize || i === textItems.length - 1) {
-            chunks.push([...currentChunk]);
+        // Create a chunk when we've reached the target size
+        if (currentWordCount >= targetChunkSize) {
+            chunks.push({
+                items: [...currentChunk],
+                wordCount: currentWordCount
+            });
+            console.log(`Created chunk with ${currentWordCount} words (${currentChunk.length} text items)`);
+            
+            // Reset for next chunk
             currentChunk = [];
+            currentWordCount = 0;
+            // New random target for next chunk
+            targetChunkSize = Math.floor(Math.random() * 26) + MIN_WORDS_PER_CHUNK;
         }
     }
 
-    // Calculate how many chunks we need to highlight
-    const avgWordsPerChunk = totalWords / chunks.length;
-    const chunksToHighlight = Math.ceil(wordsToHighlight / avgWordsPerChunk);
-
-    // Randomly select chunks
-    const selectedChunks: TextItem[] = [];
-    const shuffledIndices = Array.from({ length: chunks.length }, (_, i) => i)
-        .sort(() => Math.random() - 0.5);
-
-    for (let i = 0; i < Math.min(chunksToHighlight, chunks.length); i++) {
-        const chunk = chunks[shuffledIndices[i]];
-        selectedChunks.push(...chunk);
+    // Handle remaining items - only add if they have at least MIN_WORDS_PER_CHUNK words
+    if (currentWordCount >= MIN_WORDS_PER_CHUNK) {
+        chunks.push({
+            items: [...currentChunk],
+            wordCount: currentWordCount
+        });
+        console.log(`Created final chunk with ${currentWordCount} words (${currentChunk.length} text items)`);
+    } else if (currentWordCount > 0) {
+        console.log(`Discarded final partial chunk with only ${currentWordCount} words (less than ${MIN_WORDS_PER_CHUNK})`);
     }
 
-    return selectedChunks;
+    console.log(`Created ${chunks.length} valid chunks (each with ${MIN_WORDS_PER_CHUNK}+ words)`);
+
+    if (chunks.length === 0) {
+        return [];
+    }
+
+    // Calculate how many chunks we need to reach the target word count
+    const avgWordsPerChunk = chunks.reduce((sum, c) => sum + c.wordCount, 0) / chunks.length;
+    const chunksNeeded = Math.ceil(wordsToHighlight / avgWordsPerChunk);
+
+    console.log(`Need approximately ${chunksNeeded} chunks to highlight ${wordsToHighlight} words`);
+
+    // Randomly select chunks (shuffle and pick first N)
+    const shuffledChunks = [...chunks].sort(() => Math.random() - 0.5);
+    const selectedChunks = shuffledChunks.slice(0, Math.min(chunksNeeded, chunks.length));
+
+    // Calculate actual words being highlighted
+    const actualWordsHighlighted = selectedChunks.reduce((sum, c) => sum + c.wordCount, 0);
+    console.log(`Selected ${selectedChunks.length} chunks, highlighting ${actualWordsHighlighted} words total`);
+
+    // Flatten selected chunks into text items
+    const highlightItems: TextItem[] = [];
+    for (const chunk of selectedChunks) {
+        highlightItems.push(...chunk.items);
+    }
+
+    console.log(`Total highlight text items: ${highlightItems.length}`);
+
+    return highlightItems;
 }
 
 /**
