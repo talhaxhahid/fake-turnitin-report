@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, BlendMode } from 'pdf-lib';
 
 interface TextItem {
     text: string;
@@ -188,14 +188,16 @@ async function addHighlightsToPdf(pdfBytes: Uint8Array, highlightItems: TextItem
 
         // PDF.js y-coordinate is already in PDF coordinate system (bottom-left origin)
         // Just use the coordinates directly
+        // Using 'Multiply' blend mode makes the highlight appear behind the text
         page.drawRectangle({
             x: item.x,
             y: item.y - 4, // Slight adjustment for better positioning
             width: item.width,
             height: item.height + 2, // Add padding
             color: rgb(r, g, b), // Cyan
-            opacity: 0.3,
-            borderOpacity: 0
+            opacity: 0.4, // Slightly higher opacity since Multiply darkens less
+            borderOpacity: 0,
+            blendMode: BlendMode.Multiply // This makes the highlight blend with text instead of covering it
         });
     }
 
