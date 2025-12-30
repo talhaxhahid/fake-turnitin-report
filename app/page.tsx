@@ -101,28 +101,42 @@ export default function Home() {
 
       // Prepare document for merging
       let documentPdfBytes: Uint8Array;
-      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+      // Convert Word to PDF if needed (and extract text)
+      let fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+      let extractedText = '';
 
-      // Convert Word to PDF if needed
       if (fileExtension === 'doc' || fileExtension === 'docx') {
         setUploadProgress(20);
-        const { convertWordToPdf } = await import('./utils/pdfHelpers');
-        documentPdfBytes = await convertWordToPdf(selectedFile);
+        const { convertWordToPdf, extractTextFromWord } = await import('./utils/pdfHelpers');
+
+        // Parallel execution for speed
+        const [pdfBytes, text] = await Promise.all([
+          convertWordToPdf(selectedFile),
+          extractTextFromWord(selectedFile)
+        ]);
+
+        documentPdfBytes = pdfBytes;
+        extractedText = text;
       } else {
         // It's already a PDF
         setUploadProgress(20);
         const arrayBuffer = await selectedFile.arrayBuffer();
         documentPdfBytes = new Uint8Array(arrayBuffer);
+
+        // Extract text from PDF for accurate word count
+        const { extractTextFromPdf } = await import('./utils/pdfHighlighter');
+        extractedText = await extractTextFromPdf(documentPdfBytes);
       }
 
       setUploadProgress(40);
 
-      // Calculate file metadata
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const text = await selectedFile.text().catch(() => '');
-      const wordCount = text.split(/\s+/).filter(Boolean).length || 4125;
-      const charCount = text.length || 25069;
+      // Calculate stats from extracted text
+      const wordCount = extractedText.split(/\s+/).filter(Boolean).length || 0;
+      const charCount = extractedText.length || 0;
       const fileSize = `${(selectedFile.size / 1024).toFixed(1)} KB`;
+
+      const { getPdfPageCount } = await import('./utils/pdfHelpers');
+      const pageCount = await getPdfPageCount(documentPdfBytes);
 
       // Generate Turnitin report PDF
       const params = new URLSearchParams({
@@ -133,7 +147,7 @@ export default function Home() {
         aiPercent: aiReportValue === '*' ? Math.floor(Math.random() * 30 + 20).toString() : aiReportValue,
         similarityPercent: similarityValue,
         fileSize: fileSize,
-        docPages: '1', // We don't have easy access to page count
+        docPages: pageCount.toString(),
       });
 
       setUploadProgress(60);

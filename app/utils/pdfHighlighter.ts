@@ -21,7 +21,9 @@ async function extractTextContent(pdfBytes: Uint8Array): Promise<TextItem[]> {
         PDFJS.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
     }
 
-    const loadingTask = PDFJS.getDocument({ data: pdfBytes });
+    // Clone the data to prevent buffer detachment/neutering by PDF.js worker transfer
+    const data = new Uint8Array(pdfBytes);
+    const loadingTask = PDFJS.getDocument({ data });
     const pdf = await loadingTask.promise;
     const textItems: TextItem[] = [];
 
@@ -34,7 +36,7 @@ async function extractTextContent(pdfBytes: Uint8Array): Promise<TextItem[]> {
 
             // Transform matrix: [scaleX, skewX, skewY, scaleY, translateX, translateY]
             const [scaleX, , , scaleY, x, y] = item.transform;
-            
+
             // Calculate width from the item width property or estimate from text length
             const width = item.width || (item.str.length * Math.abs(scaleX) * 0.6);
             // Height is typically the absolute value of scaleY (font size)
@@ -120,15 +122,18 @@ async function addHighlightsToPdf(pdfBytes: Uint8Array, highlightItems: TextItem
         if (item.pageIndex >= pages.length) continue;
 
         const page = pages[item.pageIndex];
+        const r = 0 / 255;
+        const g = 175 / 255;
+        const b = 215 / 255;
 
         // PDF.js y-coordinate is already in PDF coordinate system (bottom-left origin)
         // Just use the coordinates directly
         page.drawRectangle({
             x: item.x,
-            y: item.y - 2, // Slight adjustment for better positioning
+            y: item.y - 4, // Slight adjustment for better positioning
             width: item.width,
-            height: item.height + 4, // Add padding
-            color: rgb(0, 1, 1), // Cyan
+            height: item.height + 2, // Add padding
+            color: rgb(r, g, b), // Cyan
             opacity: 0.3,
             borderOpacity: 0
         });
@@ -142,7 +147,7 @@ async function addHighlightsToPdf(pdfBytes: Uint8Array, highlightItems: TextItem
  */
 export async function highlightPdfText(pdfBytes: Uint8Array, percentage: number): Promise<Uint8Array> {
     console.log(`Highlighting PDF with ${percentage}% AI detection`);
-    
+
     if (percentage <= 0) {
         console.log('Percentage is 0 or less, returning original PDF');
         return pdfBytes;
@@ -183,4 +188,12 @@ export async function highlightPdfText(pdfBytes: Uint8Array, percentage: number)
         // Return original PDF if highlighting fails
         return originalBytes;
     }
+}
+
+/**
+ * Extract raw text string from PDF
+ */
+export async function extractTextFromPdf(pdfBytes: Uint8Array): Promise<string> {
+    const textItems = await extractTextContent(pdfBytes);
+    return textItems.map(item => item.text).join(' ');
 }

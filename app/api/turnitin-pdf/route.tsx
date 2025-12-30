@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
 export async function GET(request: Request) {
     try {
         const url = new URL(request.url)
-        
+
         const reportTitle = url.searchParams.get('reportTitle') ?? 'Ccw C'
         const subtitle = url.searchParams.get('subtitle') ?? 'ccw'
         const fileName = url.searchParams.get('fileName') ?? 'CW2-Agentic-AI.docx'
@@ -319,276 +319,321 @@ export async function GET(request: Request) {
         const institution = url.searchParams.get('institution') ?? 'COMSATS Institute of Information Technology'
         const docPages = Number(url.searchParams.get('docPages') ?? '1')
         const submissionId = url.searchParams.get('submissionId') ?? `trn:oid:::1:${Math.floor(Math.random() * 9000000000 + 1000000000)}`
-        
+
         const now = new Date()
         const submissionDate = formatTurnitinDate(now)
         const downloadDate = formatTurnitinDate(new Date(now.getTime() + 2 * 60 * 1000))
 
         const doc = (
-        <Document>
-            <Page size={[8.68 * 72, 10.9 * 72]} style={styles.page1}>
+            <Document>
+                <Page size={[8.68 * 72, 10.9 * 72]} style={styles.page1}>
 
-                <View style={styles.header}>
-                    <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
-                        <Image
-                            style={styles.logo}
-                            src={base64String}
-                        />
+                    <View style={styles.header}>
+                        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                            <Image
+                                style={styles.logo}
+                                src={base64String}
+                            />
+                            <Text
+
+                                render={({ pageNumber, totalPages }) =>
+                                    `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                }
+                                fixed
+                            />
+                        </View>
                         <Text
 
                             render={({ pageNumber, totalPages }) =>
-                                `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                `Submission ID   ${submissionId}`
                             }
                             fixed
                         />
                     </View>
-                    <Text
-
-                        render={({ pageNumber, totalPages }) =>
-                            `Submission ID   ${submissionId}`
-                        }
-                        fixed
-                    />
-                </View>
 
 
 
-                {/* Title Block */}
-                <Text style={styles.titleLarge}>{reportTitle}</Text>
-                <Text style={styles.titleSmall}>{subtitle}</Text>
+                    {/* Title Block */}
+                    <Text style={styles.titleLarge}>{reportTitle}</Text>
+                    <Text style={styles.titleSmall}>{subtitle}</Text>
 
-                {/* Quick Submit Rows */}
-                <View style={styles.quickRow}>
-                    <Image style={styles.icon} src={clipboard} />
-                    <Text>Quick Submit</Text>
-                </View>
-                <View style={styles.quickRow}>
-                    <Image style={styles.icon} src={quicksubmit} />
-                    <Text>Quick Submit</Text>
-                </View>
-                <View style={styles.quickRow}>
-                    <Image style={styles.icon} src={cap} />
-                    <Text>{institution}</Text>
-                </View>
-
-                {/* Document Details Section */}
-                <Text style={styles.sectionHeading}>Document Details</Text>
-
-                <View style={styles.detailsRow}>
-                    {/* Left Column */}
-                    <View style={styles.leftColumn}>
-                        <Text style={styles.detailLabel}>Submission ID</Text>
-                        <Text style={styles.detailValue}>{submissionId}</Text>
-
-                        <Text style={styles.detailLabel}>Submission Date</Text>
-                        <Text style={styles.detailValue}>{submissionDate}</Text>
-
-                        <Text style={styles.detailLabel}>Download Date</Text>
-                        <Text style={styles.detailValue}>{downloadDate}</Text>
-
-                        <Text style={styles.detailLabel}>File Name</Text>
-                        <Text style={styles.detailValue}>{fileName}</Text>
-
-                        <Text style={styles.detailLabel}>File Size</Text>
-                        <Text style={styles.detailValue}>{fileSize}</Text>
+                    {/* Quick Submit Rows */}
+                    <View style={styles.quickRow}>
+                        <Image style={styles.icon} src={clipboard} />
+                        <Text>Quick Submit</Text>
+                    </View>
+                    <View style={styles.quickRow}>
+                        <Image style={styles.icon} src={quicksubmit} />
+                        <Text>Quick Submit</Text>
+                    </View>
+                    <View style={styles.quickRow}>
+                        <Image style={styles.icon} src={cap} />
+                        <Text>{institution}</Text>
                     </View>
 
-                    {/* Stats Box */}
-                    <View style={styles.statsBox}>
-                        <Text>{docPages} Pages</Text>
-                        <Text>{wordCount.toLocaleString()} Words</Text>
-                        <Text>{charCount.toLocaleString()} Characters</Text>
+                    {/* Document Details Section */}
+                    <Text style={styles.sectionHeading}>Document Details</Text>
+
+                    <View style={styles.detailsRow}>
+                        {/* Left Column */}
+                        <View style={styles.leftColumn}>
+                            <Text style={styles.detailLabel}>Submission ID</Text>
+                            <Text style={styles.detailValue}>{submissionId}</Text>
+
+                            <Text style={styles.detailLabel}>Submission Date</Text>
+                            <Text style={styles.detailValue}>{submissionDate}</Text>
+
+                            <Text style={styles.detailLabel}>Download Date</Text>
+                            <Text style={styles.detailValue}>{downloadDate}</Text>
+
+                            <Text style={styles.detailLabel}>File Name</Text>
+                            <Text style={styles.detailValue}>{fileName}</Text>
+
+                            <Text style={styles.detailLabel}>File Size</Text>
+                            <Text style={styles.detailValue}>{fileSize}</Text>
+                        </View>
+
+                        {/* Stats Box */}
+                        <View style={styles.statsBox}>
+                            <Text>{docPages} Pages</Text>
+                            <Text>{wordCount.toLocaleString()} Words</Text>
+                            <Text>{charCount.toLocaleString()} Characters</Text>
+                        </View>
                     </View>
-                </View>
 
-                {/* Footer */}
+                    {/* Footer */}
 
-                <View style={styles.footer}>
-                    <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
-                        <Image
-                            style={styles.logo}
-                            src={base64String}
-                        />
+                    <View style={styles.footer}>
+                        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                            <Image
+                                style={styles.logo}
+                                src={base64String}
+                            />
+                            <Text
+
+                                render={({ pageNumber, totalPages }) =>
+                                    `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                }
+                                fixed
+                            />
+                        </View>
                         <Text
 
                             render={({ pageNumber, totalPages }) =>
-                                `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                `Submission ID   ${submissionId}`
                             }
                             fixed
                         />
                     </View>
-                    <Text
 
-                        render={({ pageNumber, totalPages }) =>
-                            `Submission ID   ${submissionId}`
-                        }
-                        fixed
-                    />
-                </View>
+                </Page>
+                <Page size={[8.68 * 72, 10.9 * 72]} style={styles.page2}>
 
-            </Page>
-            <Page size={[8.68 * 72, 10.9 * 72]} style={styles.page2}>
+                    <View style={styles.header}>
+                        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                            <Image
+                                style={styles.logo}
+                                src={base64String}
+                            />
+                            <Text
 
-                <View style={styles.header}>
-                    <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
-                        <Image
-                            style={styles.logo}
-                            src={base64String}
-                        />
+                                render={({ pageNumber, totalPages }) =>
+                                    `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                }
+                                fixed
+                            />
+                        </View>
                         <Text
 
                             render={({ pageNumber, totalPages }) =>
-                                `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                `Submission ID   ${submissionId}`
                             }
                             fixed
                         />
                     </View>
-                    <Text
+                    {/* Header */}
+                    <View style={styles.hr} />
+                    <View style={styles.headerRow}>
+                        <View style={styles.leftHeader}>
+                            <Text style={styles.percent}>{aiPercent}% detected as AI</Text>
+                            <Text style={styles.subtitle}>
+                                The percentage indicates the combined amount of likely
+                                AI-generated text as well as likely AI-generated text that was
+                                also likely AI-paraphrased.
+                            </Text>
+                        </View>
 
-                        render={({ pageNumber, totalPages }) =>
-                            `Submission ID   ${submissionId}`
-                        }
-                        fixed
-                    />
-                </View>
-                {/* Header */}
-                <View style={styles.hr} />
-                <View style={styles.headerRow}>
-                    <View style={styles.leftHeader}>
-                        <Text style={styles.percent}>{aiPercent}% detected as AI</Text>
-                        <Text style={styles.subtitle}>
-                            The percentage indicates the combined amount of likely
-                            AI-generated text as well as likely AI-generated text that was
-                            also likely AI-paraphrased.
-                        </Text>
-                    </View>
-
-                    <View style={styles.cautionBox}>
-                        <Text style={{ fontSize: 6.5, fontWeight: "600", marginBottom: 4 }}>
-                            Caution: Review required.
-                        </Text>
-                        <Text style={{ fontSize: 6 }}>
-                            It is essential to understand the limitations of AI detection
-                            before making decisions about a student's work. We encourage you
-                            to learn more about Turnitin's AI detection capabilities before
-                            using the tool.
-                        </Text>
-                    </View>
-                </View>
-
-                {/* <View style={styles.hr} /> */}
-
-                {/* Detection Groups */}
-                <View style={styles.detectionRow}>
-                    <Text style={styles.sectionHeading}>Detection Groups</Text>
-                    <View style={styles.groupItem}>
-                        <Image src={robot1} style={styles.icon2} />
-                        <View style={styles.groupTextBlock}>
-                            <Text style={styles.detailValue2}>25 AI-generated only {aiPercent}%</Text>
-                            <Text style={styles.detailLabel}>
-                                Likely AI-generated text from a large-language model.
+                        <View style={styles.cautionBox}>
+                            <Text style={{ fontSize: 6.5, fontWeight: "600", marginBottom: 4 }}>
+                                Caution: Review required.
+                            </Text>
+                            <Text style={{ fontSize: 6 }}>
+                                It is essential to understand the limitations of AI detection
+                                before making decisions about a student's work. We encourage you
+                                to learn more about Turnitin's AI detection capabilities before
+                                using the tool.
                             </Text>
                         </View>
                     </View>
 
-                    <View style={styles.groupItem}>
-                        <Image src={robot2} style={styles.icon2} />
-                        <View style={styles.groupTextBlock}>
-                            <Text style={styles.detailValue2}>
-                                0 AI-generated text that was AI-paraphrased 0%
-                            </Text>
-                            <Text style={styles.detailLabel}>
-                                Likely AI-generated text that was likely revised using an
-                                AI-paraphrase tool or word spinner.
-                            </Text>
+                    {/* <View style={styles.hr} /> */}
+
+                    {/* Detection Groups */}
+                    <View style={styles.detectionRow}>
+                        <Text style={styles.sectionHeading}>Detection Groups</Text>
+                        <View style={styles.groupItem}>
+                            <Image src={robot1} style={styles.icon2} />
+                            <View style={styles.groupTextBlock}>
+                                <Text style={styles.detailValue2}>25 AI-generated only {aiPercent}%</Text>
+                                <Text style={styles.detailLabel}>
+                                    Likely AI-generated text from a large-language model.
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.groupItem}>
+                            <Image src={robot2} style={styles.icon2} />
+                            <View style={styles.groupTextBlock}>
+                                <Text style={styles.detailValue2}>
+                                    0 AI-generated text that was AI-paraphrased 0%
+                                </Text>
+                                <Text style={styles.detailLabel}>
+                                    Likely AI-generated text that was likely revised using an
+                                    AI-paraphrase tool or word spinner.
+                                </Text>
+                            </View>
                         </View>
                     </View>
-                </View>
 
-                <View style={styles.hr} />
+                    <View style={styles.hr} />
 
-                {/* Disclaimer */}
-                <View style={styles.disclaimer}>
-                    <Text style={{ fontWeight: 600, marginBottom: 1 }}>Disclaimer</Text>
-                    {'\n'}
-                    <Text>
-                        Our AI writing assessment is designed to help educators identify text
-                        that might be prepared by a generative AI tool. Our AI writing
-                        assessment may not always be accurate (i.e., our AI models may produce
-                        either false positive results or false negative results), so it should
-                        not be used as the sole basis for adverse actions against a student.
-                        It takes further scrutiny and human judgment in conjunction with an
-                        organization's application of its specific academic policies to
-                        determine whether any academic misconduct has occurred.
+                    {/* Disclaimer */}
+                    <View style={styles.disclaimer}>
+                        <Text style={{ fontWeight: 600, marginBottom: 1 }}>Disclaimer</Text>
+                        {'\n'}
+                        <Text>
+                            Our AI writing assessment is designed to help educators identify text
+                            that might be prepared by a generative AI tool. Our AI writing
+                            assessment may not always be accurate (i.e., our AI models may produce
+                            either false positive results or false negative results), so it should
+                            not be used as the sole basis for adverse actions against a student.
+                            It takes further scrutiny and human judgment in conjunction with an
+                            organization's application of its specific academic policies to
+                            determine whether any academic misconduct has occurred.
+                        </Text>
+                    </View>
+
+                    <View style={styles.hr} />
+
+                    {/* FAQ area: left text, right small graphic */}
+                    <View style={styles.faqSection}>
+                        <View style={styles.faqLeft}>
+                            <Text style={styles.faqHeading}>Frequently Asked Questions</Text>
+
+                            <Text style={styles.question}>
+                                How should I interpret Turnitin’s AI writing percentage and false
+                                positives?
+                            </Text>
+                            <Text style={styles.answer}>
+                                The percentage shown in the AI writing report is the amount of qualifying text within the submission that Turnitin’s AI writing
+                                detection model determines was either likely AI-generated text from a large-language model or likely AI-generated text that was
+                                likely revised using an AI paraphrase tool or word spinner.
+                                {'\n'}{'\n'}
+                                False positives (incorrectly flagging human-written text as AI-generated) are a possibility in AI models.
+                                {'\n'}{'\n'}
+                                AI detection scores under 20%, which we do not surface in new reports, have a higher likelihood of false positives. To reduce the
+                                likelihood of misinterpretation, no score or highlights are attributed and are indicated with an asterisk in the report (*%).
+                                {'\n'}{'\n'}
+                                The AI writing percentage should not be the sole basis to determine whether misconduct has occurred. The reviewer/instructor
+                                should use the percentage as a means to start a formative conversation with their student and/or use it to examine the submitted
+                                assignment in accordance with their school's policies.
+                                {'\n'}{'\n'}
+                            </Text>
+                        </View>
+
+                        <View style={styles.faqRightGraphic}>
+                            <Image src={faqImage} style={styles.smallImage} />
+                        </View>
+                    </View>
+                    <Text style={styles.question}>What does 'qualifying text' mean?</Text>
+                    <Text style={styles.answer}>
+                        Our model only processes qualifying text in the form of long-form writing. Long-form writing means individual sentences contained in paragraphs that make up a
+                        longer piece of written work, such as an essay, a dissertation, or an article, etc. Qualifying text that has been determined to be likely AI-generated will be
+                        highlighted in cyan in the submission, and likely AI-generated and then likely AI-paraphrased will be highlighted purple.
+                        {'\n'}{'\n'}
+                        Non-qualifying text, such as bullet points, annotated bibliographies, etc., will not be processed and can create disparity between the submission highlights and the
+                        percentage shown.
                     </Text>
-                </View>
+                    <View style={styles.footer}>
+                        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                            <Image
+                                style={styles.logo}
+                                src={base64String}
+                            />
+                            <Text
 
-                <View style={styles.hr} />
-
-                {/* FAQ area: left text, right small graphic */}
-                <View style={styles.faqSection}>
-                    <View style={styles.faqLeft}>
-                        <Text style={styles.faqHeading}>Frequently Asked Questions</Text>
-
-                        <Text style={styles.question}>
-                            How should I interpret Turnitin’s AI writing percentage and false
-                            positives?
-                        </Text>
-                        <Text style={styles.answer}>
-                            The percentage shown in the AI writing report is the amount of qualifying text within the submission that Turnitin’s AI writing
-                            detection model determines was either likely AI-generated text from a large-language model or likely AI-generated text that was
-                            likely revised using an AI paraphrase tool or word spinner.
-                            {'\n'}{'\n'}
-                            False positives (incorrectly flagging human-written text as AI-generated) are a possibility in AI models.
-                            {'\n'}{'\n'}
-                            AI detection scores under 20%, which we do not surface in new reports, have a higher likelihood of false positives. To reduce the
-                            likelihood of misinterpretation, no score or highlights are attributed and are indicated with an asterisk in the report (*%).
-                            {'\n'}{'\n'}
-                            The AI writing percentage should not be the sole basis to determine whether misconduct has occurred. The reviewer/instructor
-                            should use the percentage as a means to start a formative conversation with their student and/or use it to examine the submitted
-                            assignment in accordance with their school's policies.
-                            {'\n'}{'\n'}
-                        </Text>
-                    </View>
-
-                    <View style={styles.faqRightGraphic}>
-                        <Image src={faqImage} style={styles.smallImage} />
-                    </View>
-                </View>
-                <Text style={styles.question}>What does 'qualifying text' mean?</Text>
-                <Text style={styles.answer}>
-                    Our model only processes qualifying text in the form of long-form writing. Long-form writing means individual sentences contained in paragraphs that make up a
-                    longer piece of written work, such as an essay, a dissertation, or an article, etc. Qualifying text that has been determined to be likely AI-generated will be
-                    highlighted in cyan in the submission, and likely AI-generated and then likely AI-paraphrased will be highlighted purple.
-                    {'\n'}{'\n'}
-                    Non-qualifying text, such as bullet points, annotated bibliographies, etc., will not be processed and can create disparity between the submission highlights and the
-                    percentage shown.
-                </Text>
-                <View style={styles.footer}>
-                    <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
-                        <Image
-                            style={styles.logo}
-                            src={base64String}
-                        />
+                                render={({ pageNumber, totalPages }) =>
+                                    `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                }
+                                fixed
+                            />
+                        </View>
                         <Text
 
                             render={({ pageNumber, totalPages }) =>
-                                `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                `Submission ID   ${submissionId}`
                             }
                             fixed
                         />
                     </View>
-                    <Text
+                </Page>
+                {Array.from({ length: docPages }).map((_, i) => (
+                    <Page key={i} size={[8.68 * 72, 10.9 * 72]} style={styles.page2}>
+                        <View style={styles.header}>
+                            <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                                <Image
+                                    style={styles.logo}
+                                    src={base64String}
+                                />
+                                <Text
+                                    render={({ pageNumber, totalPages }) =>
+                                        `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                    }
+                                    fixed
+                                />
+                            </View>
+                            <Text
+                                render={({ pageNumber, totalPages }) =>
+                                    `Submission ID   ${submissionId}`
+                                }
+                                fixed
+                            />
+                        </View>
 
-                        render={({ pageNumber, totalPages }) =>
-                            `Submission ID   ${submissionId}`
-                        }
-                        fixed
-                    />
-                </View>
-            </Page>
-        </Document>
-    )
+                        <View style={styles.footer}>
+                            <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                                <Image
+                                    style={styles.logo}
+                                    src={base64String}
+                                />
+                                <Text
+                                    render={({ pageNumber, totalPages }) =>
+                                        `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                    }
+                                    fixed
+                                />
+                            </View>
+                            <Text
+                                render={({ pageNumber, totalPages }) =>
+                                    `Submission ID   ${submissionId}`
+                                }
+                                fixed
+                            />
+                        </View>
+                    </Page>
+                ))}
+            </Document>
+        )
 
         const pdfBuffer = await pdf(doc).toBuffer()
 
@@ -600,7 +645,7 @@ export async function GET(request: Request) {
         })
     } catch (error) {
         console.error('Error in turnitin-pdf route:', error);
-        return new NextResponse(JSON.stringify({ 
+        return new NextResponse(JSON.stringify({
             error: 'Failed to generate PDF',
             message: error instanceof Error ? error.message : 'Unknown error'
         }), {

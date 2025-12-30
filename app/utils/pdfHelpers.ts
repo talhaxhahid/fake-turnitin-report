@@ -86,6 +86,15 @@ export async function convertWordToPdf(file: File): Promise<Uint8Array> {
     return await pdfDoc.save();
 }
 
+// Helper function to extract text from Word document
+export async function extractTextFromWord(file: File): Promise<string> {
+    const mammoth = await import('mammoth');
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+}
+
+// Helper function to merge PDFs (Turnitin report at the beginning, then the document)
 // Helper function to merge PDFs (Turnitin report at the beginning, then the document)
 export async function mergePdfs(turnitinPdfBytes: Uint8Array, documentPdfBytes: Uint8Array): Promise<Uint8Array> {
     const { PDFDocument } = await import('pdf-lib');
@@ -96,13 +105,116 @@ export async function mergePdfs(turnitinPdfBytes: Uint8Array, documentPdfBytes: 
     const turnitinPdf = await PDFDocument.load(turnitinPdfBytes);
     const documentPdf = await PDFDocument.load(documentPdfBytes);
 
-    // Copy pages from Turnitin report first
-    const turnitinPages = await mergedPdf.copyPages(turnitinPdf, turnitinPdf.getPageIndices());
-    turnitinPages.forEach((page) => mergedPdf.addPage(page));
+    const turnitinPageCount = turnitinPdf.getPageCount();
+    const documentPageCount = documentPdf.getPageCount();
 
-    // Then copy pages from the document
-    const documentPages = await mergedPdf.copyPages(documentPdf, documentPdf.getPageIndices());
-    documentPages.forEach((page) => mergedPdf.addPage(page));
+    console.log(`MergePdfs Debug: Turnitin Template Pages: ${turnitinPageCount}, Document Pages: ${documentPageCount}`);
+
+    // 1. Copy the first 2 intro pages (Cover + Report details) from Turnitin PDF
+    const introPageCount = 2;
+
+    const introIndices = [];
+    for (let i = 0; i < Math.min(introPageCount, turnitinPageCount); i++) {
+        introIndices.push(i);
+    }
+
+    if (introIndices.length > 0) {
+        const introPages = await mergedPdf.copyPages(turnitinPdf, introIndices);
+        introPages.forEach(page => mergedPdf.addPage(page));
+    }
+
+    // 2. Get the blank template pages from Turnitin PDF (index 2 onwards)
+    const templateIndices = [];
+    for (let i = introPageCount; i < turnitinPageCount; i++) {
+        templateIndices.push(i);
+    }
+
+    // Copy these template pages to the merged PDF (we keep them as PDFPage objects to add them later)
+    let templatePages: any[] = [];
+    if (templateIndices.length > 0) {
+        templatePages = await mergedPdf.copyPages(turnitinPdf, templateIndices);
+    }
+
+    // 3. Embed the document pages so they can be drawn/scaled onto the template pages
+    // Explicitly get all page indices to ensure we embed everything
+    const docIndices = documentPdf.getPageIndices();
+    const embeddedDocPages = await mergedPdf.embedPdf(documentPdf, docIndices);
+
+    console.log(`MergePdfs Debug: Embedded ${embeddedDocPages.length} pages from document`);
+
+    // 4. Combine: For each document page, add a template page and draw the document page on it
+    for (let i = 0; i < embeddedDocPages.length; i++) {
+        let page;
+
+        // Use a corresponding template page if available
+        if (i < templatePages.length) {
+            page = templatePages[i];
+            mergedPdf.addPage(page);
+        } else {
+            // If we run out of template pages (docPages mismatch?), duplicate the last template page
+            // We have to copy it again from the source turnitinPdf.
+            if (templateIndices.length > 0) {
+                const lastTemplateIndex = templateIndices[templateIndices.length - 1];
+                const [freshPage] = await mergedPdf.copyPages(turnitinPdf, [lastTemplateIndex]);
+                page = freshPage;
+                mergedPdf.addPage(page);
+            } else {
+                // Fallback if no template pages exist (shouldn't happen given logic)
+                page = mergedPdf.addPage();
+            }
+        }
+
+        const size = page.getSize();
+        const pageWidth = size.width;
+        const pageHeight = size.height;
+
+        const embeddedPage = embeddedDocPages[i];
+        const { width: docWidth, height: docHeight } = embeddedPage;
+
+        console.log(`Template page size: ${pageWidth} x ${pageHeight}`);
+        console.log(`Document page ${i + 1} original size: ${docWidth} x ${docHeight}`);
+
+        // Define margins for header and footer areas
+        const headerMargin = 50; // Space reserved for header
+        const footerMargin = 40; // Space reserved for footer
+        const horizontalMargin = 30; // Side margins
+
+        // Calculate available space within the template
+        const availableWidth = pageWidth - (horizontalMargin * 2);
+        const availableHeight = pageHeight - headerMargin - footerMargin;
+
+        console.log(`Available space: ${availableWidth} x ${availableHeight}`);
+
+        // Calculate scale factors for width and height
+        const widthScale = docWidth <= availableWidth ? 1 : availableWidth / docWidth;
+        const heightScale = docHeight <= availableHeight ? 1 : availableHeight / docHeight;
+
+        // Use the smaller scale to maintain aspect ratio, but only if scaling is needed
+        let scale = 1;
+        if (docWidth > availableWidth || docHeight > availableHeight) {
+            scale = Math.min(widthScale, heightScale);
+        }
+
+        console.log(`Calculated scale: ${scale} (widthScale: ${widthScale}, heightScale: ${heightScale})`);
+
+        const scaledWidth = docWidth * scale;
+        const scaledHeight = docHeight * scale;
+
+        console.log(`Scaled size: ${scaledWidth} x ${scaledHeight}`);
+
+        // Center horizontally and position with footer margin at bottom
+        const x = (pageWidth - scaledWidth) / 2;
+        const y = footerMargin + (availableHeight - scaledHeight) / 2; // Vertically center in available space
+
+        console.log(`Position: x=${x}, y=${y}`);
+
+        page.drawPage(embeddedPage, {
+            x,
+            y,
+            xScale: scale,
+            yScale: scale,
+        });
+    }
 
     // Return merged PDF as Uint8Array
     return await mergedPdf.save();
@@ -110,7 +222,7 @@ export async function mergePdfs(turnitinPdfBytes: Uint8Array, documentPdfBytes: 
 
 // Helper function to add headers and footers to document pages
 export async function addHeadersAndFooters(
-    pdfBytes: Uint8Array, 
+    pdfBytes: Uint8Array,
     submissionId: string,
     startPageNumber: number = 3
 ): Promise<Uint8Array> {
@@ -181,6 +293,13 @@ export function downloadFile(data: Uint8Array, filename: string) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+// Helper function to get the number of pages in a PDF
+export async function getPdfPageCount(pdfBytes: Uint8Array): Promise<number> {
+    const { PDFDocument } = await import('pdf-lib');
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    return pdfDoc.getPageCount();
 }
 
 // Export PDF highlighting function
