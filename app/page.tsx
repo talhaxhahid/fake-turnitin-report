@@ -11,7 +11,15 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   const [aiReportValue, setAiReportValue] = useState<string>('0');
   const [similarityValue, setSimilarityValue] = useState<string>('0');
-  const [reportTitle, setReportTitle] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState('');
+  const [generatedFiles, setGeneratedFiles] = useState<{
+    turnitinPdf: Uint8Array | null;
+    turnitinFilename: string;
+    similarityPdf: Uint8Array | null;
+    similarityFilename: string;
+  } | null>(null);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -49,13 +57,13 @@ export default function Home() {
   };
 
   const handleFile = (file: File) => {
-    // Validate file type
-    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    const validExtensions = ['.pdf', '.doc', '.docx'];
+    // Validate file type - only PDF allowed
+    const validTypes = ['application/pdf'];
+    const validExtensions = ['.pdf'];
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
 
     if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
-      alert('Please upload a PDF, DOC, or DOCX file.');
+      alert('Please upload a PDF file only.');
       return;
     }
 
@@ -92,12 +100,28 @@ export default function Home() {
     document.getElementById('file-input')?.click();
   };
 
+  const handleDownloadFile = (pdfBytes: Uint8Array, filename: string) => {
+    // Create a new ArrayBuffer and copy data to avoid TypeScript issues
+    const newBuffer = new ArrayBuffer(pdfBytes.length);
+    new Uint8Array(newBuffer).set(pdfBytes);
+    const blob = new Blob([newBuffer], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleSubmit = async () => {
     if (!selectedFile) return;
 
     try {
-      setIsUploading(true);
-      setUploadProgress(10);
+      setIsGenerating(true);
+      setGenerationProgress(0);
+      setGenerationStatus('Preparing document...');
 
       // Prepare document for merging
       let documentPdfBytes: Uint8Array;
@@ -106,7 +130,8 @@ export default function Home() {
       let extractedText = '';
 
       if (fileExtension === 'doc' || fileExtension === 'docx') {
-        setUploadProgress(20);
+        setGenerationProgress(5);
+        setGenerationStatus('Converting Word document to PDF...');
         const { convertWordToPdf, extractTextFromWord } = await import('./utils/pdfHelpers');
 
         // Parallel execution for speed
@@ -119,7 +144,8 @@ export default function Home() {
         extractedText = text;
       } else {
         // It's already a PDF
-        setUploadProgress(20);
+        setGenerationProgress(5);
+        setGenerationStatus('Reading PDF document...');
         const arrayBuffer = await selectedFile.arrayBuffer();
         documentPdfBytes = new Uint8Array(arrayBuffer);
 
@@ -128,7 +154,8 @@ export default function Home() {
         extractedText = await extractTextFromPdf(documentPdfBytes);
       }
 
-      setUploadProgress(40);
+      setGenerationProgress(10);
+      setGenerationStatus('Analyzing document content...');
 
       // Calculate stats from extracted text
       const wordCount = extractedText.split(/\s+/).filter(Boolean).length || 0;
@@ -138,72 +165,114 @@ export default function Home() {
       const { getPdfPageCount } = await import('./utils/pdfHelpers');
       const pageCount = await getPdfPageCount(documentPdfBytes);
 
-      // Generate Turnitin report PDF
-      const params = new URLSearchParams({
+      // Calculate AI percentage
+      const aiPercentageNum = aiReportValue === '*'
+        ? Math.floor(Math.random() * 30 + 20)
+        : parseInt(aiReportValue);
+
+      // Calculate Similarity percentage
+      const similarityPercentageNum = parseInt(similarityValue) || 0;
+
+      // ===== GENERATE TURNITIN PDF (AI REPORT) =====
+      setGenerationProgress(20);
+      setGenerationStatus('Generating AI Report...');
+
+      const turnitinParams = new URLSearchParams({
         fileName: selectedFile.name,
-        reportTitle: reportTitle || 'Originality Report',
+        reportTitle: 'Originality Report',
         wordCount: wordCount.toString(),
         charCount: charCount.toString(),
-        aiPercent: aiReportValue === '*' ? Math.floor(Math.random() * 30 + 20).toString() : aiReportValue,
+        aiPercent: aiPercentageNum.toString(),
         similarityPercent: similarityValue,
         fileSize: fileSize,
         docPages: pageCount.toString(),
       });
 
-      setUploadProgress(60);
-
-      const response = await fetch(`/api/turnitin-pdf?${params.toString()}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      const turnitinResponse = await fetch(`/api/turnitin-pdf?${turnitinParams.toString()}`);
+      if (!turnitinResponse.ok) {
+        const errorData = await turnitinResponse.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(errorData.message || 'Failed to generate Turnitin report');
       }
 
-      const turnitinPdfBytes = new Uint8Array(await response.arrayBuffer());
+      const turnitinReportPdfBytes = new Uint8Array(await turnitinResponse.arrayBuffer());
 
-      setUploadProgress(70);
+      setGenerationProgress(30);
+      setGenerationStatus('Applying AI highlights to document...');
 
-      // Apply highlights based on AI percentage
-      const aiPercentageNum = aiReportValue === '*'
-        ? Math.floor(Math.random() * 30 + 20)
-        : parseInt(aiReportValue);
-
-      const { highlightPdfText, mergePdfs, downloadFile } = await import('./utils/pdfHelpers');
-      const highlightedPdfBytes = aiPercentageNum > 0
-        ? await highlightPdfText(documentPdfBytes, aiPercentageNum)
+      // Apply AI highlights using pdfHelpers.ts and pdfHighlighter.ts
+      const { highlightPdfText: highlightAiText, mergePdfs: mergeAiPdfs } = await import('./utils/pdfHelpers');
+      const aiHighlightedPdfBytes = aiPercentageNum > 0
+        ? await highlightAiText(documentPdfBytes, aiPercentageNum)
         : documentPdfBytes;
 
-      setUploadProgress(85);
+      setGenerationProgress(40);
+      setGenerationStatus('Merging AI Report with document...');
 
-      // Merge PDFs (Turnitin report first, then highlighted document)
-      const mergedPdfBytes = await mergePdfs(turnitinPdfBytes, highlightedPdfBytes);
+      // Merge Turnitin report with AI-highlighted document
+      const turnitinMergedPdfBytes = await mergeAiPdfs(turnitinReportPdfBytes, aiHighlightedPdfBytes);
 
-      setUploadProgress(90);
+      setGenerationProgress(50);
+      setGenerationStatus('Generating Similarity Report...');
 
-      // Download the merged PDF
-      const outputFilename = `turnitin_${selectedFile.name.replace(/\.[^.]+$/, '')}.pdf`;
-      downloadFile(mergedPdfBytes, outputFilename);
+      // ===== GENERATE SIMILARITY PDF (SIMILARITY REPORT) =====
+      const similarityParams = new URLSearchParams({
+        fileName: selectedFile.name,
+        reportTitle: 'Similarity Report',
+        wordCount: wordCount.toString(),
+        charCount: charCount.toString(),
+        aiPercent: aiPercentageNum.toString(),
+        similarityPercent: similarityPercentageNum.toString(),
+        fileSize: fileSize,
+        docPages: pageCount.toString(),
+      });
 
-      setUploadProgress(100);
+      const similarityResponse = await fetch(`/api/similarity-pdf?${similarityParams.toString()}`);
+      if (!similarityResponse.ok) {
+        const errorData = await similarityResponse.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to generate Similarity report');
+      }
 
-      // Show success message
-      alert('Report generated and downloaded successfully!');
+      const similarityReportPdfBytes = new Uint8Array(await similarityResponse.arrayBuffer());
 
-      // Reset and close modal
-      setTimeout(() => {
-        setShowModal(false);
-        setAiReportValue('0');
-        setSimilarityValue('0');
-        setReportTitle('');
-        setSelectedFile(null);
-        setUploadProgress(0);
-        setIsUploading(false);
-      }, 1000);
+      setGenerationProgress(65);
+      setGenerationStatus('Applying similarity highlights to document...');
+
+      // Apply Similarity highlights using similarityPdfHelpers.ts and similarityPdfHighlighter.ts
+      const { highlightPdfText: highlightSimilarityText, mergePdfs: mergeSimilarityPdfs } = await import('./utils/similarityPdfHelpers');
+      const similarityHighlightedPdfBytes = similarityPercentageNum > 0
+        ? await highlightSimilarityText(documentPdfBytes, similarityPercentageNum)
+        : documentPdfBytes;
+
+      setGenerationProgress(80);
+      setGenerationStatus('Merging Similarity Report with document...');
+
+      // Merge Similarity report with similarity-highlighted document
+      const similarityMergedPdfBytes = await mergeSimilarityPdfs(similarityReportPdfBytes, similarityHighlightedPdfBytes);
+
+      setGenerationProgress(95);
+      setGenerationStatus('Finalizing reports...');
+
+      // Store generated files for download buttons
+      const baseFilename = selectedFile.name.replace(/\.[^.]+$/, '');
+      
+      setGeneratedFiles({
+        turnitinPdf: turnitinMergedPdfBytes,
+        turnitinFilename: `turnitin_ai_${baseFilename}.pdf`,
+        similarityPdf: similarityMergedPdfBytes,
+        similarityFilename: `similarity_${baseFilename}.pdf`,
+      });
+
+      setGenerationProgress(100);
+      setGenerationStatus('Reports ready for download!');
+      setIsGenerating(false);
+
     } catch (error) {
       console.error('Error generating report:', error);
       console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
       alert(`Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setIsUploading(false);
-      setUploadProgress(0);
+      setIsGenerating(false);
+      setGenerationProgress(0);
+      setGenerationStatus('');
     }
   };
 
@@ -211,16 +280,16 @@ export default function Home() {
     setShowModal(false);
     setAiReportValue('0');
     setSimilarityValue('0');
-    setReportTitle('');
+    setIsGenerating(false);
+    setGenerationProgress(0);
+    setGenerationStatus('');
+    setGeneratedFiles(null);
   };
 
   const handleSimilarityChange = (value: string) => {
     const numValue = parseInt(value) || 0;
     if (numValue >= 0 && numValue <= 100) {
       setSimilarityValue(value);
-      if (numValue === 0) {
-        setReportTitle('');
-      }
     }
   };
 
@@ -287,13 +356,13 @@ export default function Home() {
                   {selectedFile ? selectedFile.name : 'Drop your document here'}
                 </p>
                 <p className="upload-subtext">or click to browse</p>
-                <p className="upload-formats">Supports PDF, DOC, DOCX (Max: 10MB)</p>
+                <p className="upload-formats">Supports PDF only (Max: 10MB)</p>
 
                 <input
                   id="file-input"
                   type="file"
                   className="file-input"
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept=".pdf,application/pdf"
                   onChange={handleFileSelect}
                 />
               </div>
@@ -372,70 +441,116 @@ export default function Home() {
             </div>
 
             <div className="modal-body">
-              {/* AI Report Section */}
-              <div className="modal-section">
-                <label className="modal-label">
-                  <span className="label-icon">🤖</span>
-                  AI Report Percentage
-                </label>
-                <select
-                  className="modal-select"
-                  value={aiReportValue}
-                  onChange={(e) => setAiReportValue(e.target.value)}
-                >
-                  <option value="0">0%</option>
-                  <option value="*">* (Random)</option>
-                  <option value="30">30%</option>
-                  <option value="40">40%</option>
-                  <option value="50">50%</option>
-                  <option value="60">60%</option>
-                  <option value="70">70%</option>
-                  <option value="80">80%</option>
-                  <option value="90">90%</option>
-                  <option value="100">100%</option>
-                </select>
-              </div>
-
-              {/* Similarity Report Section */}
-              <div className="modal-section">
-                <label className="modal-label">
-                  <span className="label-icon">📊</span>
-                  Similarity Report Percentage
-                </label>
-                <input
-                  type="number"
-                  className="modal-input"
-                  min="0"
-                  max="100"
-                  value={similarityValue}
-                  onChange={(e) => handleSimilarityChange(e.target.value)}
-                  placeholder="Enter value (0-100)"
-                />
-              </div>
-
-              {/* Report Title (Conditional) */}
-              {parseInt(similarityValue) > 0 && (
-                <div className="modal-section modal-section-fade-in">
-                  <label className="modal-label">
-                    <span className="label-icon">📝</span>
-                    Report Title
-                  </label>
-                  <input
-                    type="text"
-                    className="modal-input"
-                    value={reportTitle}
-                    onChange={(e) => setReportTitle(e.target.value)}
-                    placeholder="Enter report title"
-                  />
+              {/* Show progress indicator when generating */}
+              {isGenerating && (
+                <div className="generation-progress-container">
+                  <div className="generation-progress-header">
+                    <span className="generation-progress-label">Generating Reports...</span>
+                    <span className="generation-progress-percentage">{generationProgress}%</span>
+                  </div>
+                  <div className="generation-progress-bar">
+                    <div
+                      className="generation-progress-fill"
+                      style={{ width: `${generationProgress}%` }}
+                    ></div>
+                  </div>
+                  <div className="generation-progress-status">
+                    {generationStatus}
+                  </div>
                 </div>
+              )}
+
+              {/* Show download buttons when files are ready */}
+              {generatedFiles && !isGenerating && (
+                <div className="download-section">
+                  <div className="download-success-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="download-title">Reports Ready!</h3>
+                  <p className="download-subtitle">Your reports have been generated successfully.</p>
+                  <div className="download-buttons">
+                    <button
+                      className="download-btn download-btn-ai"
+                      onClick={() => generatedFiles.turnitinPdf && handleDownloadFile(generatedFiles.turnitinPdf, generatedFiles.turnitinFilename)}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download AI Report
+                    </button>
+                    <button
+                      className="download-btn download-btn-similarity"
+                      onClick={() => generatedFiles.similarityPdf && handleDownloadFile(generatedFiles.similarityPdf, generatedFiles.similarityFilename)}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download Similarity Report
+                    </button>
+                  </div>
+                  <button className="generate-new-btn" onClick={handleCloseModal}>
+                    Generate New Reports
+                  </button>
+                </div>
+              )}
+
+              {/* Show settings form when not generating and no files ready */}
+              {!isGenerating && !generatedFiles && (
+                <>
+                  {/* AI Report Section */}
+                  <div className="modal-section">
+                    <label className="modal-label">
+                      <span className="label-icon">🤖</span>
+                      AI Report Percentage
+                    </label>
+                    <select
+                      className="modal-select"
+                      value={aiReportValue}
+                      onChange={(e) => setAiReportValue(e.target.value)}
+                    >
+                      <option value="0">0%</option>
+                      <option value="*">* (Random)</option>
+                      <option value="30">30%</option>
+                      <option value="40">40%</option>
+                      <option value="50">50%</option>
+                      <option value="60">60%</option>
+                      <option value="70">70%</option>
+                      <option value="80">80%</option>
+                      <option value="90">90%</option>
+                      <option value="100">100%</option>
+                    </select>
+                  </div>
+
+                  {/* Similarity Report Section */}
+                  <div className="modal-section">
+                    <label className="modal-label">
+                      <span className="label-icon">📊</span>
+                      Similarity Report Percentage
+                    </label>
+                    <input
+                      type="number"
+                      className="modal-input"
+                      min="0"
+                      max="100"
+                      value={similarityValue}
+                      onChange={(e) => handleSimilarityChange(e.target.value)}
+                      placeholder="Enter value (0-100)"
+                    />
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="modal-footer">
-              <button className="modal-btn-submit" onClick={handleSubmit}>
-                Generate Report
-              </button>
-            </div>
+            {/* Show Generate button only when not generating and no files ready */}
+            {!isGenerating && !generatedFiles && (
+              <div className="modal-footer">
+                <button className="modal-btn-submit" onClick={handleSubmit}>
+                  Generate Report
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
