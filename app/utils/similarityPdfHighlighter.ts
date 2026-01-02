@@ -185,9 +185,9 @@ async function addHighlightsToPdf(pdfBytes: Uint8Array, highlightItems: TextItem
         const page = pages[item.pageIndex];
         // Using a different color for similarity highlights (orange/red tones)
         // This distinguishes from AI detection (cyan)
-        const r = 255 / 255;
-        const g = 165 / 255;
-        const b = 0 / 255;
+        const r = 249 / 255;
+        const g = 130 / 255;
+        const b = 141 / 255;
 
         // PDF.js y-coordinate is already in PDF coordinate system (bottom-left origin)
         // Just use the coordinates directly
@@ -198,7 +198,7 @@ async function addHighlightsToPdf(pdfBytes: Uint8Array, highlightItems: TextItem
             width: item.width,
             height: item.height + 2, // Add padding
             color: rgb(r, g, b), // Orange for similarity
-            opacity: 0.4, // Slightly higher opacity since Multiply darkens less
+            opacity: 0.7, // Slightly higher opacity since Multiply darkens less
             borderOpacity: 0,
             blendMode: BlendMode.Multiply // This makes the highlight blend with text instead of covering it
         });
