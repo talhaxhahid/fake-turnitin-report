@@ -41,6 +41,191 @@ function generateSubmissionId() {
     return `trn:oid:::1:${randomPart}`
 }
 
+// Import similarity dataset
+import similarityDataset from '@/app/utils/similarity_dataset.json';
+
+// 10 distinct colors for sources (index-based, not type-based)
+const SOURCE_COLORS_BY_INDEX = [
+    { countBg: '#cb1476', sourceBg: '#fedce7' },   // Pink
+    { countBg: '#1e6da8', sourceBg: '#d0e8f9' },   // Blue
+    { countBg: '#0d8a47', sourceBg: '#d4f0e0' },   // Green
+    { countBg: '#9b59b6', sourceBg: '#f0e6f6' },   // Purple
+    { countBg: '#e67e22', sourceBg: '#fef0e0' },   // Orange
+    { countBg: '#16a085', sourceBg: '#d5f5f0' },   // Teal
+    { countBg: '#c0392b', sourceBg: '#fbe4e2' },   // Red
+    { countBg: '#2980b9', sourceBg: '#dbeaf5' },   // Light Blue
+    { countBg: '#8e44ad', sourceBg: '#f3e5f5' },   // Violet
+    { countBg: '#27ae60', sourceBg: '#e0f5e9' },   // Light Green
+];
+
+// Labels for source types
+const SOURCE_TYPE_LABELS = {
+    student_papers: 'Student papers',
+    publications: 'Publications',
+    internet_sources: 'Internet'
+};
+
+// Generate Match Groups breakdown based on overall similarity
+function generateMatchGroups(similarityPercent: number) {
+    if (similarityPercent === 0) {
+        return {
+            notCitedOrQuoted: 0,
+            missingQuotations: 0,
+            missingCitation: 0,
+            citedAndQuoted: 0
+        };
+    }
+
+    // Distribute: Not Cited or Quoted gets 70-90%, rest distributed among others
+    const notCitedOrQuotedRatio = 0.7 + Math.random() * 0.2;
+    const remaining = 1 - notCitedOrQuotedRatio;
+    
+    const missingQuotationsRatio = Math.random() * remaining * 0.5;
+    const missingCitationRatio = Math.random() * (remaining - missingQuotationsRatio) * 0.6;
+    const citedAndQuotedRatio = remaining - missingQuotationsRatio - missingCitationRatio;
+
+    return {
+        notCitedOrQuoted: Math.round(similarityPercent * notCitedOrQuotedRatio),
+        missingQuotations: Math.round(similarityPercent * missingQuotationsRatio),
+        missingCitation: Math.round(similarityPercent * missingCitationRatio),
+        citedAndQuoted: Math.round(similarityPercent * citedAndQuotedRatio)
+    };
+}
+
+// Generate Top Sources breakdown (3 types)
+function generateTopSourcesBreakdown(similarityPercent: number) {
+    if (similarityPercent === 0) {
+        return { internetSources: 0, publications: 0, submittedWorks: 0 };
+    }
+
+    // Random distribution among three source types
+    const total = similarityPercent;
+    const internetRatio = 0.1 + Math.random() * 0.3;
+    const publicationsRatio = 0.1 + Math.random() * 0.3;
+    const submittedWorksRatio = 1 - internetRatio - publicationsRatio;
+
+    return {
+        internetSources: Math.round(total * internetRatio),
+        publications: Math.round(total * publicationsRatio),
+        submittedWorks: Math.round(total * submittedWorksRatio)
+    };
+}
+
+// Generate source entries for page 3
+interface SourceEntry {
+    count: number;
+    type: 'student_papers' | 'publications' | 'internet_sources';
+    sourceText: string;
+    percentage: number;
+    colors: { countBg: string; sourceBg: string };
+    label: string;
+}
+
+// Helper to truncate text to max length with ellipsis
+function truncateText(text: string, maxLength: number = 80): string {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + '...';
+}
+
+interface TopSourcesBreakdown {
+    internetSources: number;
+    publications: number;
+    submittedWorks: number;
+}
+
+function generateSources(topSourcesBreakdown: TopSourcesBreakdown): SourceEntry[] {
+    const { internetSources, publications, submittedWorks } = topSourcesBreakdown;
+    
+    // If all are 0, return empty
+    if (internetSources === 0 && publications === 0 && submittedWorks === 0) return [];
+
+    const sources: SourceEntry[] = [];
+    const maxTotalSources = 10;
+    
+    // Calculate how many sources per type - flexible based on percentage
+    // Higher percentage = potentially more sources (1-3 per type)
+    const getSourceCount = (percent: number): number => {
+        if (percent === 0) return 0;
+        if (percent <= 5) return 1;
+        if (percent <= 15) return Math.random() > 0.5 ? 2 : 1;
+        return Math.floor(Math.random() * 3) + 1; // 1-3 sources
+    };
+
+    let internetCount = getSourceCount(internetSources);
+    let publicationsCount = getSourceCount(publications);
+    let submittedCount = getSourceCount(submittedWorks);
+    
+    // Ensure total doesn't exceed 10
+    let total = internetCount + publicationsCount + submittedCount;
+    while (total > maxTotalSources) {
+        // Reduce randomly
+        const r = Math.random();
+        if (r < 0.33 && internetCount > 1) {
+            internetCount--;
+        } else if (r < 0.66 && publicationsCount > 1) {
+            publicationsCount--;
+        } else if (submittedCount > 1) {
+            submittedCount--;
+        } else if (internetCount > 1) {
+            internetCount--;
+        } else if (publicationsCount > 1) {
+            publicationsCount--;
+        }
+        total = internetCount + publicationsCount + submittedCount;
+    }
+
+    let globalCount = 1;
+
+    // Helper function to generate sources for a type
+    const generateForType = (
+        type: 'student_papers' | 'publications' | 'internet_sources',
+        count: number,
+        totalPercent: number
+    ) => {
+        if (count === 0 || totalPercent === 0) return;
+        
+        const dataset = similarityDataset[type];
+        let remainingPercent = totalPercent;
+        
+        for (let i = 0; i < count; i++) {
+            const sourceText = dataset[Math.floor(Math.random() * dataset.length)];
+            
+            // Calculate percentage for this source - random distribution
+            let percentage: number;
+            if (i === count - 1) {
+                // Last source gets whatever is remaining
+                percentage = remainingPercent;
+            } else {
+                // Random portion of remaining (20%-80%)
+                const portion = 0.2 + Math.random() * 0.6;
+                percentage = Math.round(remainingPercent * portion);
+            }
+            remainingPercent -= percentage;
+
+            // Only add if percentage > 0
+            if (percentage > 0) {
+                const colorIndex = (globalCount - 1) % SOURCE_COLORS_BY_INDEX.length;
+                sources.push({
+                    count: globalCount++,
+                    type,
+                    sourceText: truncateText(sourceText, 80),
+                    percentage,
+                    colors: SOURCE_COLORS_BY_INDEX[colorIndex],
+                    label: SOURCE_TYPE_LABELS[type]
+                });
+            }
+        }
+    };
+
+    // Generate sources for each type with their cumulative percentages
+    generateForType('internet_sources', internetCount, internetSources);
+    generateForType('publications', publicationsCount, publications);
+    generateForType('student_papers', submittedCount, submittedWorks);
+
+    return sources;
+}
+
+
 function formatTurnitinDate(date: Date, timeZone = 'America/Los_Angeles') {
     return date.toLocaleString('en-US', {
         year: 'numeric',
@@ -255,6 +440,11 @@ const styles = StyleSheet.create({
         backgroundColor: "#e6e6e6",
         marginVertical: 12,
     },
+    hr2: {
+        height: 1,
+        backgroundColor: "#e6e6e6",
+        marginVertical: 8,
+    },
     // Detection groups
     detectionRow: {
         flexDirection: "row",
@@ -343,6 +533,36 @@ const styles = StyleSheet.create({
         color: "#666",
         marginTop: 8,
     },
+    count: {
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        fontSize: 7,
+        fontWeight: 600,
+        color: "#ffffff",
+        padding: 2,
+        textAlign: "center",
+        borderRadius: 10,
+        minWidth: 25,
+        backgroundColor: "#cb1476",
+        minHeight: 15,
+        marginTop: 3
+    },
+    source: {
+        fontSize: 7,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        fontWeight: 600,
+        color: "#000",
+        padding: 2,
+        borderRadius: 10,
+        minWidth: 68,
+        minHeight: 15,
+        backgroundColor: "#fedce7",
+        marginTop: 3
+    },
 
 })
 
@@ -365,6 +585,11 @@ export async function GET(request: Request) {
         const now = new Date()
         const submissionDate = formatTurnitinDate(now)
         const downloadDate = formatTurnitinDate(new Date(now.getTime() + 2 * 60 * 1000))
+
+        // Generate dynamic values based on similarity percentage
+        const matchGroups = generateMatchGroups(similarityPercent)
+        const topSourcesBreakdown = generateTopSourcesBreakdown(similarityPercent)
+        const sources = generateSources(topSourcesBreakdown)
 
         const doc = (
             <Document>
@@ -530,7 +755,7 @@ export async function GET(request: Request) {
                             <View style={styles.groupItem}>
                                 <Image src={not_cited_or_quoted} style={styles.icon2} />
                                 <View style={styles.groupTextBlock}>
-                                    <Text style={styles.detailValue2}>Not Cited or Quoted  {similarityPercent}%</Text>
+                                    <Text style={styles.detailValue2}>{matchGroups.notCitedOrQuoted} Not Cited or Quoted  {matchGroups.notCitedOrQuoted}%</Text>
                                     <Text style={styles.detailLabel2}>
                                         Matches with neither in-text citation nor quotation marks
                                     </Text>
@@ -541,7 +766,7 @@ export async function GET(request: Request) {
                                 <Image src={missing_quotation} style={styles.icon2} />
                                 <View style={styles.groupTextBlock}>
                                     <Text style={styles.detailValue2}>
-                                        0 Missing Quotations 0%
+                                        {matchGroups.missingQuotations} Missing Quotations {matchGroups.missingQuotations}%
                                     </Text>
                                     <Text style={styles.detailLabel2}>
                                         Matches that are still very similar to source material
@@ -552,7 +777,7 @@ export async function GET(request: Request) {
                                 <Image src={missing_citation} style={styles.icon2} />
                                 <View style={styles.groupTextBlock}>
                                     <Text style={styles.detailValue2}>
-                                        0 Missing Citation 0%
+                                        {matchGroups.missingCitation} Missing Citation {matchGroups.missingCitation}%
                                     </Text>
                                     <Text style={styles.detailLabel2}>
                                         Matches that have quotation marks, but no in-text citation
@@ -563,7 +788,7 @@ export async function GET(request: Request) {
                                 <Image src={cited_and_quoted} style={styles.icon2} />
                                 <View style={styles.groupTextBlock}>
                                     <Text style={styles.detailValue2}>
-                                        0 Cited and Quoted 0%
+                                        {matchGroups.citedAndQuoted} Cited and Quoted {matchGroups.citedAndQuoted}%
                                     </Text>
                                     <Text style={styles.detailLabel2}>
                                         Matches with in-text citation present, but no quotation marks
@@ -574,18 +799,18 @@ export async function GET(request: Request) {
                         <View>
                             <Text style={styles.sectionHeading2}>Top Sources</Text>
                             <View style={styles.groupItem2}>
-                                <Text style={styles.detailValue2}>4%</Text>
+                                <Text style={styles.detailValue2}>{topSourcesBreakdown.internetSources}%</Text>
                                 <Image src={internet_sources} style={styles.icon3} />
                                 <Text style={styles.detailValue2}>Internet sources </Text>
                             </View>
 
                             <View style={styles.groupItem2}>
-                                <Text style={styles.detailValue2}>4%</Text>
+                                <Text style={styles.detailValue2}>{topSourcesBreakdown.publications}%</Text>
                                 <Image src={publication} style={styles.icon3} />
                                 <Text style={styles.detailValue2}>Publications </Text>
                             </View>
                             <View style={styles.groupItem2}>
-                                <Text style={styles.detailValue2}>12%</Text>
+                                <Text style={styles.detailValue2}>{topSourcesBreakdown.submittedWorks}%</Text>
                                 <Image src={submitted_work} style={styles.icon3} />
                                 <Text style={styles.detailValue2}>Submitted works (Student Papers)</Text>
                             </View>
@@ -613,6 +838,147 @@ export async function GET(request: Request) {
                                 focus your attention there for further review.
                             </Text>
                         </View>
+                    </View>
+
+                    
+
+                    
+                    
+                    <View style={styles.footer}>
+                        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                            <Image
+                                style={styles.logo}
+                                src={base64String}
+                            />
+                            <Text
+
+                                render={({ pageNumber, totalPages }) =>
+                                    `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                }
+                                fixed
+                            />
+                        </View>
+                        <Text
+
+                            render={({ pageNumber, totalPages }) =>
+                                `Submission ID   ${submissionId}`
+                            }
+                            fixed
+                        />
+                    </View>
+                </Page>
+                <Page size={[8.68 * 72, 10.9 * 72]} style={styles.page2}>
+
+                    <View style={styles.header}>
+                        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 }}>
+                            <Image
+                                style={styles.logo}
+                                src={base64String}
+                            />
+                            <Text
+
+                                render={({ pageNumber, totalPages }) =>
+                                    `Page ${pageNumber} of ${totalPages} - Cover Page`
+                                }
+                                fixed
+                            />
+                        </View>
+                        <Text
+
+                            render={({ pageNumber, totalPages }) =>
+                                `Submission ID   ${submissionId}`
+                            }
+                            fixed
+                        />
+                    </View>
+                    
+
+                    {/* Detection Groups */}
+                    <View style={styles.detectionRow}>
+                        <View>
+                            <Text style={styles.sectionHeading2}>Match Groups</Text>
+                            <View style={styles.groupItem}>
+                                <Image src={not_cited_or_quoted} style={styles.icon2} />
+                                <View style={styles.groupTextBlock}>
+                                    <Text style={styles.detailValue2}>{matchGroups.notCitedOrQuoted} Not Cited or Quoted  {matchGroups.notCitedOrQuoted}%</Text>
+                                    <Text style={styles.detailLabel2}>
+                                        Matches with neither in-text citation nor quotation marks
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.groupItem}>
+                                <Image src={missing_quotation} style={styles.icon2} />
+                                <View style={styles.groupTextBlock}>
+                                    <Text style={styles.detailValue2}>
+                                        {matchGroups.missingQuotations} Missing Quotations {matchGroups.missingQuotations}%
+                                    </Text>
+                                    <Text style={styles.detailLabel2}>
+                                        Matches that are still very similar to source material
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.groupItem}>
+                                <Image src={missing_citation} style={styles.icon2} />
+                                <View style={styles.groupTextBlock}>
+                                    <Text style={styles.detailValue2}>
+                                        {matchGroups.missingCitation} Missing Citation {matchGroups.missingCitation}%
+                                    </Text>
+                                    <Text style={styles.detailLabel2}>
+                                        Matches that have quotation marks, but no in-text citation
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.groupItem}>
+                                <Image src={cited_and_quoted} style={styles.icon2} />
+                                <View style={styles.groupTextBlock}>
+                                    <Text style={styles.detailValue2}>
+                                        {matchGroups.citedAndQuoted} Cited and Quoted {matchGroups.citedAndQuoted}%
+                                    </Text>
+                                    <Text style={styles.detailLabel2}>
+                                        Matches with in-text citation present, but no quotation marks
+                                    </Text> 
+                                </View>
+                            </View>
+                        </View>
+                        <View>
+                            <Text style={styles.sectionHeading2}>Top Sources</Text>
+                            <View style={styles.groupItem2}>
+                                <Text style={styles.detailValue2}>{topSourcesBreakdown.internetSources}%</Text>
+                                <Image src={internet_sources} style={styles.icon3} />
+                                <Text style={styles.detailValue2}>Internet sources </Text>
+                            </View>
+
+                            <View style={styles.groupItem2}>
+                                <Text style={styles.detailValue2}>{topSourcesBreakdown.publications}%</Text>
+                                <Image src={publication} style={styles.icon3} />
+                                <Text style={styles.detailValue2}>Publications </Text>
+                            </View>
+                            <View style={styles.groupItem2}>
+                                <Text style={styles.detailValue2}>{topSourcesBreakdown.submittedWorks}%</Text>
+                                <Image src={submitted_work} style={styles.icon3} />
+                                <Text style={styles.detailValue2}>Submitted works (Student Papers)</Text>
+                            </View>
+                        </View>
+                            
+                    </View>
+                    <View style={styles.hr} />  
+                    <Text style={styles.sectionHeading2}>Top Sources</Text>
+                    <Text style={{color: '#636363',fontWeight: 500,fontSize: 8,marginBottom: 8}}>The sources with the highest number of matches within the submission. Overlapping sources will not be displayed.</Text>
+                    <View style={{width:'70%'}}>
+                        {sources.map((source, index) => (
+                            <View key={index}>
+                                <View style={{flexDirection:'row', alignItems:'center', gap:8,marginBottom:4}}>
+                                    <View style={{...styles.count, backgroundColor: source.colors.countBg}}><Text>{source.count}</Text></View>
+                                    <View style={{...styles.source, backgroundColor: source.colors.sourceBg}}><Text>{source.label}</Text></View>
+                                </View>
+                                <View style={{display:'flex', flexDirection:'row', alignItems:'center', justifyContent:'space-between', gap:15}}>
+                                    <Text style={{color:'#000',fontWeight:600,fontSize:8}}>{source.sourceText}</Text>
+                                    <Text style={{color:'#000',fontWeight:600,fontSize:8}}>{source.percentage}%</Text>
+                                </View>
+                                {index < sources.length - 1 && <View style={styles.hr2} />}
+                            </View>
+                        ))}
                     </View>
 
                     

@@ -110,7 +110,7 @@ export async function mergePdfs(turnitinPdfBytes: Uint8Array, documentPdfBytes: 
     console.log(`[Similarity] MergePdfs Debug: Turnitin Template Pages: ${turnitinPageCount}, Document Pages: ${documentPageCount}`);
 
     // 1. Copy the first 2 intro pages (Cover + Report details) from Turnitin PDF
-    const introPageCount = 2;
+    const introPageCount = 3;
 
     const introIndices = [];
     for (let i = 0; i < Math.min(introPageCount, turnitinPageCount); i++) {
