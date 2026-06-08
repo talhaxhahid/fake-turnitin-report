@@ -1,0 +1,25 @@
+export const SITE = {
+  name: "Turnitin Report Generator",
+  shortName: "TurnitinReport",
+  url: "https://customturnitinreport.com",
+  email: "support@customturnitinreport.com",
+  description:
+    "Free Turnitin report generator. Create accurate AI detection and similarity reports with custom percentages in seconds. Trusted by students, freelancers, and educators worldwide.",
+  keywords: [
+    "turnitin report generator",
+    "free turnitin report",
+    "custom turnitin report",
+    "turnitin report generation",
+    "turnitin similarity report",
+    "turnitin ai detection report",
+    "fake turnitin report",
+    "turnitin report download",
+    "plagiarism report generator",
+    "ai content detection report",
+    "originality report generator",
+    "turnitin report pdf",
+    "create turnitin report online",
+    "turnitin report sample",
+    "instant turnitin report",
+  ],
+};
