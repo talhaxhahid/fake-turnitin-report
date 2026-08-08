@@ -1,26 +1,28 @@
 import { MongoClient, type Db } from 'mongodb';
 
-const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB || 'turnitin_report';
-
-if (!uri) {
-  throw new Error('MONGODB_URI is not set. Add it to .env.local.');
-}
-
 declare global {
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-const clientPromise: Promise<MongoClient> =
-  global._mongoClientPromise ??
-  (global._mongoClientPromise = new MongoClient(uri, {
-    maxPoolSize: 10,
-  }).connect());
+export async function getClient(): Promise<MongoClient> {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error('MONGODB_URI is not set in environment variables.');
+  }
+
+  if (!global._mongoClientPromise) {
+    global._mongoClientPromise = new MongoClient(uri, {
+      maxPoolSize: 10,
+    }).connect();
+  }
+  return global._mongoClientPromise;
+}
 
 export async function getDb(): Promise<Db> {
-  const client = await clientPromise;
+  const dbName = process.env.MONGODB_DB || 'turnitin_report';
+  const client = await getClient();
   return client.db(dbName);
 }
 
-export default clientPromise;
+export default getDb;
