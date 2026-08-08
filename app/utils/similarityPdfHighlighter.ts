@@ -16,9 +16,10 @@ async function extractTextContent(pdfBytes: Uint8Array): Promise<TextItem[]> {
     // Dynamic import for pdf.js
     const PDFJS = await import('pdfjs-dist');
 
-    // Use local worker file copied to public folder
+    // Set worker source to CDN URL matching pdfjs-dist version to avoid host MIME type issues
     if (typeof window !== 'undefined') {
-        PDFJS.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+        const version = PDFJS.version || '5.4.449';
+        PDFJS.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
     }
 
     // Clone the data to prevent buffer detachment/neutering by PDF.js worker transfer
