@@ -1,8 +1,8 @@
 export const SITE = {
   name: "Turnitin Report Generator",
   shortName: "TurnitinReport",
-  url: "https://freeturnitinreport.com",
-  email: "support@freeturnitinreport.com",
+  url: "https://freeplagiarismreport.com",
+  email: "info@freeplagiarismreport.com",
   description:
     "Free Turnitin report generator. Create accurate AI detection and similarity reports with custom percentages in seconds. Trusted by students, freelancers, and educators worldwide.",
   keywords: [
