@@ -172,6 +172,11 @@ export default function RootLayout({
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
         />
+        <Script
+          src="https://cdn.zanderio.ai/widget/loader.js"
+          data-id="wdg_L9dZTZmsmrsF3nSW3IfPLoxs"
+          strategy="lazyOnload"
+        />
       </body>
     </html>
   );
