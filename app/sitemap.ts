@@ -3,7 +3,7 @@ import { SITE } from './lib/seo';
 import { posts } from './blog/posts';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const siteUpdated = new Date('2026-08-01');
+  const siteUpdated = new Date(); // auto-updates on each build/deploy
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE.url}/`,                       lastModified: siteUpdated, changeFrequency: 'weekly',  priority: 1.0 },

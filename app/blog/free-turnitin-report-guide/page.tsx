@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
 import JsonLd from '../../components/JsonLd';
@@ -19,6 +20,20 @@ export const metadata: Metadata = {
     type: 'article',
     publishedTime: post.date,
     url: `${SITE.url}/blog/${post.slug}`,
+    images: [
+      {
+        url: '/images/blog/free-guide-hero.jpg',
+        width: 1200,
+        height: 675,
+        alt: 'Complete Free Turnitin Report Guide',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: post.title,
+    description: post.description,
+    images: ['/images/blog/free-guide-hero.jpg'],
   },
 };
 
@@ -68,6 +83,16 @@ export default function Post() {
       <section className="section">
         <div className="container">
           <article className="prose">
+            <div className="prose-img-wrapper">
+              <Image
+                src="/images/blog/free-guide-hero.jpg"
+                alt="Free Turnitin Report Guide with secure PDF download and educational shield vector art"
+                width={1200}
+                height={675}
+                priority
+                className="prose-img"
+              />
+            </div>
             <p>
               Searching for a <strong>free Turnitin report</strong>? You&apos;re
               in the right place. This complete guide covers everything you need

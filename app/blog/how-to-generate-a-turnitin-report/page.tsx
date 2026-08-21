@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
 import JsonLd from '../../components/JsonLd';
@@ -19,6 +20,20 @@ export const metadata: Metadata = {
     type: 'article',
     publishedTime: post.date,
     url: `${SITE.url}/blog/${post.slug}`,
+    images: [
+      {
+        url: '/images/blog/generate-report-hero.jpg',
+        width: 1200,
+        height: 675,
+        alt: 'How to Generate a Turnitin Report Online (Free Method)',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: post.title,
+    description: post.description,
+    images: ['/images/blog/generate-report-hero.jpg'],
   },
 };
 
@@ -68,6 +83,16 @@ export default function Post() {
       <section className="section">
         <div className="container">
           <article className="prose">
+            <div className="prose-img-wrapper">
+              <Image
+                src="/images/blog/generate-report-hero.jpg"
+                alt="Turnitin online PDF generation flow"
+                width={1200}
+                height={675}
+                priority
+                className="prose-img"
+              />
+            </div>
             <p>
               If you&apos;ve ever needed a Turnitin similarity or AI detection
               report fast — for an essay you want to preview, a freelance
